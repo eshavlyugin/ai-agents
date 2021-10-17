@@ -1,0 +1,9 @@
+[package]
+name = "agents"
+version = "0.1.0"
+authors = ["Evgeny Shavlyugin <eshavlyugin@gmail.com>"]
+
+[dependencies]
+streaming-iterator = "0.1.5"
+num = "0.4.0"
+enum-display-derive = "0.1.1"
