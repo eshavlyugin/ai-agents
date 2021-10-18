@@ -1,5 +1,5 @@
 [package]
-name = "agents"
+name = "ai-agents"
 version = "0.1.0"
 authors = ["Evgeny Shavlyugin <eshavlyugin@gmail.com>"]
 
