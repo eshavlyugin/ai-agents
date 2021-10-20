@@ -123,18 +123,22 @@ impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for Recursive
     }
 }
 
-pub struct RecursiveStateGenerator<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E>> {
+pub trait ShouldContinueSearch<E: Environment> {
+    fn should_continue(&mut self, state: &E::State) -> bool;
+}
+
+pub struct RecursiveStateGenerator<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldContinueSearch<E>> {
     visitor: RecursiveStateVisitor<'a, E, A>,
     env: &'a E
 }
 
-impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E>> RecursiveStateGenerator<'a, E, A> {
+impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldContinueSearch<E>> RecursiveStateGenerator<'a, E, A> {
     pub fn new(initial: E::State, env: &'a E, agent: &'a mut A) -> Self {
         RecursiveStateGenerator { visitor: RecursiveStateVisitor::new(initial, env, agent), env }
     }
 }
 
-impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E>> StreamingIterator for RecursiveStateGenerator<'a, E, A> {
+impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldContinueSearch<E>> StreamingIterator for RecursiveStateGenerator<'a, E, A> {
     type Item = E::State;
 
     fn advance(&mut self) {
@@ -143,6 +147,8 @@ impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E>> StreamingI
             if self.env.is_terminal_state(&self.visitor.state) {
                 self.visitor.stop_expand_current();
                 break;
+            } else if !self.visitor.agent.should_continue(&self.visitor.state) {
+                self.visitor.stop_expand_current();
             }
             self.visitor.advance()
         }

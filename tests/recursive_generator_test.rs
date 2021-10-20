@@ -1,8 +1,8 @@
-extern crate agents;
 extern crate streaming_iterator;
 extern crate num;
+extern crate ai_agents;
 
-use agents::{Environment, RecursiveStateGenerator, ActionsGenerator, IsTerminalState};
+use ai_agents::{Environment, RecursiveStateGenerator, ActionsGenerator, IsTerminalState, ShouldContinueSearch};
 use streaming_iterator::StreamingIterator;
 
 struct ZeroOneEnvironment {
@@ -10,6 +10,12 @@ struct ZeroOneEnvironment {
 }
 
 struct ZeroOneAgent {
+}
+
+impl ShouldContinueSearch<ZeroOneEnvironment> for ZeroOneAgent {
+    fn should_continue(&mut self, _state: &Vec<bool>) -> bool {
+        true
+    }
 }
 
 impl Environment for ZeroOneEnvironment {
@@ -36,7 +42,7 @@ impl ActionsGenerator<ZeroOneEnvironment> for ZeroOneAgent {
     }
 }
 
-/*#[test]
+#[test]
 fn test_zero_one_recursive_generator() {
     let env = ZeroOneEnvironment{max_size: 3};
     let mut agent = ZeroOneAgent{};
@@ -48,7 +54,7 @@ fn test_zero_one_recursive_generator() {
     }
 
     assert_eq!(count, 8);
-}*/
+}
 
 #[test]
 fn test_zero_one_initial_is_terminal() {
