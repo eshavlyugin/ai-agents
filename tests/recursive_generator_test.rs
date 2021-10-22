@@ -12,7 +12,8 @@ struct ZeroOneEnvironment {
 struct ZeroOneAgent {
 }
 
-impl ShouldContinueSearch<ZeroOneEnvironment> for ZeroOneAgent {
+
+impl<'a> ShouldContinueSearch<ZeroOneEnvironment> for ZeroOneAgent {
     fn should_continue(&mut self, _state: &Vec<bool>) -> bool {
         true
     }
@@ -45,9 +46,7 @@ impl ActionsGenerator<ZeroOneEnvironment> for ZeroOneAgent {
 #[test]
 fn test_zero_one_recursive_generator() {
     let env = ZeroOneEnvironment{max_size: 3};
-    let mut agent = ZeroOneAgent{};
-    let mut gen = RecursiveStateGenerator::new(vec![], &env, &mut agent);
-
+    let mut gen = RecursiveStateGenerator::new(vec![], &env, ZeroOneAgent{});
     let mut count = 0;
     while let Some(_) = gen.next() {
         count = count + 1;
@@ -59,8 +58,7 @@ fn test_zero_one_recursive_generator() {
 #[test]
 fn test_zero_one_initial_is_terminal() {
     let env = ZeroOneEnvironment{max_size: 0};
-    let mut agent = ZeroOneAgent{};
-    let mut gen = RecursiveStateGenerator::new(vec![], &env, &mut agent);
+    let mut gen = RecursiveStateGenerator::new(vec![], &env, ZeroOneAgent{});
 
     let mut count = 0;
     while let Some(_) = gen.next() {
@@ -73,8 +71,7 @@ fn test_zero_one_initial_is_terminal() {
 #[test]
 fn test_zero_one_recursive_generator_take_while() {
     let env = ZeroOneEnvironment{max_size: 3};
-    let mut agent = ZeroOneAgent{};
-    let mut gen = RecursiveStateGenerator::new(vec![], &env, &mut agent).take_while(|s| s[0]);
+    let mut gen = RecursiveStateGenerator::new(vec![], &env, ZeroOneAgent{}).take_while(|s| s[0]);
 
     let mut count = 0;
     while let Some(_) = gen.next() {

@@ -1,3 +1,5 @@
+mod graph;
+
 extern crate streaming_iterator;
 extern crate num;
 
@@ -45,13 +47,13 @@ pub struct RecursiveStateVisitor<'a, E: Environment, A: ActionsGenerator<E>> {
     stack: Vec<Peekable<A::ActionsIterator>>,
     state: E::State,
     env: &'a E,
-    agent: &'a mut A,
+    agent: A,
     last_action: LastVisitAction,
     need_expand_current: bool
 }
 
 impl<'a, E: Environment, A: ActionsGenerator<E>> RecursiveStateVisitor<'a, E, A> {
-    pub fn new(initial: E::State, env: &'a E, agent: &'a mut A) -> RecursiveStateVisitor<'a, E, A> {
+    pub fn new(initial: E::State, env: &'a E, agent: A) -> RecursiveStateVisitor<'a, E, A> {
         RecursiveStateVisitor {stack: vec![], state: initial, env, agent, last_action: LastVisitAction::New, need_expand_current: true}
     }
 
@@ -133,7 +135,7 @@ pub struct RecursiveStateGenerator<'a, E: Environment + IsTerminalState<E>, A: A
 }
 
 impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldContinueSearch<E>> RecursiveStateGenerator<'a, E, A> {
-    pub fn new(initial: E::State, env: &'a E, agent: &'a mut A) -> Self {
+    pub fn new(initial: E::State, env: &'a E, agent: A) -> Self {
         RecursiveStateGenerator { visitor: RecursiveStateVisitor::new(initial, env, agent), env }
     }
 }
