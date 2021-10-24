@@ -42,18 +42,18 @@ impl ActionsGenerator<SeqEnvironment> for SeqAgent {
     type ActionsIterator = Range<u8>;
 
     fn generate_actions(&mut self, _: &Vec<u8>) -> Self::ActionsIterator {
-        (1u8..10u8).into_iter()
+        (1u8..9u8).into_iter()
     }
 }
 
 #[test]
 fn test_zero_one_recursive_generator() {
-    let env = SeqEnvironment{max_size: 9};
+    let env = SeqEnvironment{max_size: 10};
     let gen = RecursiveStateGenerator::new(vec![], &env, SeqAgent{});
     let mut count: usize = 0;
     gen.for_each(|_s| count = count + 1 );
 
-    assert_eq!(count, 3486784401);
+    assert_eq!(count, 1073741824);
 }
 
 #[test]
@@ -83,10 +83,10 @@ fn generate_01_rec<F: FnMut()>(state: &mut Vec<u8>, env: &SeqEnvironment, agent:
 
 #[test]
 fn test_zero_one_simple() {
-    let env = SeqEnvironment{max_size: 9};
+    let env = SeqEnvironment{max_size: 10};
     let mut count: usize = 0;
     generate_01_rec(&mut vec![], &env, &mut SeqAgent{}, &mut || { count += 1 } );
-    assert_eq!(count, 3486784401);
+    assert_eq!(count, 1073741824);
 }
 
 #[test]
@@ -98,5 +98,5 @@ fn test_zero_one_recursive_generator_take_while() {
     let mut count = 0;
     gen.for_each(|_s| count = count + 1 );
 
-    assert_eq!(count, 243);
+    assert_eq!(count, 192);
 }
