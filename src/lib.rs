@@ -47,14 +47,13 @@ pub struct RecursiveStateVisitor<'a, E: Environment, A: ActionsGenerator<E>> {
     state: E::State,
     env: &'a E,
     agent: A,
-    last_action_in: bool,
+    last_action: LastVisitAction,
     need_expand_current: bool,
-    is_finished: bool
 }
 
 impl<'a, E: Environment, A: ActionsGenerator<E>> RecursiveStateVisitor<'a, E, A> {
     pub fn new(initial: E::State, env: &'a E, agent: A) -> RecursiveStateVisitor<'a, E, A> {
-        RecursiveStateVisitor { stack: vec![], state: initial, env, agent, last_action_in: true, need_expand_current: true, is_finished: false}
+        RecursiveStateVisitor { stack: vec![], state: initial, env, agent, last_action: LastVisitAction::EnterNew, need_expand_current: true}
     }
 
     #[inline(always)]
@@ -70,9 +69,9 @@ impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for Recursive
     fn advance(&mut self) {
         if !self.need_expand_current {
             self.env.rollback(&mut self.state, &self.stack.last().unwrap().1);
-            self.last_action_in = false;
+            self.last_action = LastVisitAction::EnterOld;
             self.need_expand_current = true;
-        } else if self.last_action_in {
+        } else if self.last_action == LastVisitAction::EnterNew {
             let mut actions = self.agent.generate_actions(&self.state);
             if let Some(action) = actions.next() {
                 self.env.apply(&mut self.state, &action);
@@ -82,21 +81,21 @@ impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for Recursive
             if let Some(iter) = self.stack.last_mut() {
                 if let Some(action) = iter.0.next() {
                     self.env.apply(&mut self.state, &action);
-                    self.last_action_in = true;
+                    self.last_action = LastVisitAction::EnterNew;
                     iter.1 = action;
                 } else {
                     self.env.rollback(&mut self.state, &iter.1);
                     self.stack.pop();
                 }
             } else {
-                self.is_finished = true;
+                self.last_action = LastVisitAction::Done;
             }
         }
     }
 
     #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
-        if self.is_finished {
+        if self.last_action == LastVisitAction::Done {
             None
         } else {
             Some(&self.state)
@@ -125,8 +124,8 @@ impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldCon
     #[inline(always)]
     fn advance(&mut self) {
         self.visitor.advance();
-        while !self.visitor.is_finished {
-            if self.visitor.last_action_in && self.env.is_terminal_state(&self.visitor.state) {
+        while self.visitor.last_action != LastVisitAction::Done {
+            if self.visitor.last_action == LastVisitAction::EnterNew && self.env.is_terminal_state(&self.visitor.state) {
                 self.visitor.stop_expand_current();
                 break;
             } else if !self.visitor.agent.should_continue(&self.visitor.state) {

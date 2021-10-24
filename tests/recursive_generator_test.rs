@@ -5,8 +5,6 @@ extern crate alloc;
 extern crate core;
 
 use ai_agents::{Environment, RecursiveStateGenerator, ActionsGenerator, IsTerminalState, ShouldContinueSearch};
-use std::iter::Copied;
-use core::slice;
 use streaming_iterator::StreamingIterator;
 use std::ops::Range;
 
@@ -50,7 +48,7 @@ impl ActionsGenerator<SeqEnvironment> for SeqAgent {
 
 #[test]
 fn test_zero_one_recursive_generator() {
-    let env = SeqEnvironment{max_size: 10};
+    let env = SeqEnvironment{max_size: 9};
     let gen = RecursiveStateGenerator::new(vec![], &env, SeqAgent{});
     let mut count: usize = 0;
     gen.for_each(|_s| count = count + 1 );
@@ -59,6 +57,7 @@ fn test_zero_one_recursive_generator() {
 }
 
 #[test]
+#[ignore]
 fn test_zero_one_initial_is_terminal() {
     let env = SeqEnvironment{max_size: 0};
     let gen = RecursiveStateGenerator::new(vec![], &env, SeqAgent{});
@@ -84,7 +83,7 @@ fn generate_01_rec<F: FnMut()>(state: &mut Vec<u8>, env: &SeqEnvironment, agent:
 
 #[test]
 fn test_zero_one_simple() {
-    let env = SeqEnvironment{max_size: 10};
+    let env = SeqEnvironment{max_size: 9};
     let mut count: usize = 0;
     generate_01_rec(&mut vec![], &env, &mut SeqAgent{}, &mut || { count += 1 } );
     assert_eq!(count, 3486784401);
@@ -94,7 +93,7 @@ fn test_zero_one_simple() {
 fn test_zero_one_recursive_generator_take_while() {
     let env = SeqEnvironment{max_size: 3};
     //let mut gen = RecursiveStateGenerator::new(vec![], &env, ZeroOneAgent{}).take_while(|s| s[0]);
-    let mut gen = RecursiveStateGenerator::new(vec![], &env, SeqAgent{}).take_while(|s| s[0] != 4);
+    let gen = RecursiveStateGenerator::new(vec![], &env, SeqAgent{}).take_while(|s| s[0] != 4);
 
     let mut count = 0;
     gen.for_each(|_s| count = count + 1 );
