@@ -1,6 +1,7 @@
 mod graph {
     use ::{Environment, ActionsGenerator};
     use ShouldContinueSearch;
+    use streaming_iterator::{convert, StreamingIterator};
 
     pub trait Graph {
         type Node: Sized;

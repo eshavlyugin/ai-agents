@@ -7,7 +7,6 @@ extern crate num;
 extern crate enum_display_derive;
 
 use streaming_iterator::StreamingIterator;
-use std::iter::Peekable;
 use std::fmt::Display;
 
 pub trait Environment {
@@ -35,7 +34,7 @@ pub trait ActionsGenerator<E: Environment> {
 }
 
 
-#[derive(Display)]
+#[derive(Display, PartialEq)]
 pub enum LastVisitAction {
     New,
     EnterNew,
@@ -44,83 +43,63 @@ pub enum LastVisitAction {
 }
 
 pub struct RecursiveStateVisitor<'a, E: Environment, A: ActionsGenerator<E>> {
-    stack: Vec<Peekable<A::ActionsIterator>>,
+    stack: Vec<(A::ActionsIterator, E::Action)>,
     state: E::State,
     env: &'a E,
     agent: A,
-    last_action: LastVisitAction,
-    need_expand_current: bool
+    last_action_in: bool,
+    need_expand_current: bool,
+    is_finished: bool
 }
 
 impl<'a, E: Environment, A: ActionsGenerator<E>> RecursiveStateVisitor<'a, E, A> {
     pub fn new(initial: E::State, env: &'a E, agent: A) -> RecursiveStateVisitor<'a, E, A> {
-        RecursiveStateVisitor {stack: vec![], state: initial, env, agent, last_action: LastVisitAction::New, need_expand_current: true}
+        RecursiveStateVisitor { stack: vec![], state: initial, env, agent, last_action_in: true, need_expand_current: true, is_finished: false}
     }
 
-    fn stop_expand_current(&mut self) {
+    #[inline(always)]
+    pub fn stop_expand_current(&mut self) {
         self.need_expand_current = false;
-    }
-
-    fn apply_action(env: &E, last_action: &mut LastVisitAction, is_action_performed: &mut bool, state: &mut E::State, action: &E::Action) {
-        env.apply(state, action);
-        *last_action = LastVisitAction::EnterNew;
-        *is_action_performed = true;
-    }
-
-    fn rollback_action(env: &E, stack: &mut Vec<Peekable<A::ActionsIterator>>, last_action: &mut LastVisitAction, is_action_performed: &mut bool, state: &mut E::State) {
-        if let Some(prev_iter) = stack.last_mut() {
-            env.rollback(state, &prev_iter.next().unwrap());
-            *last_action = LastVisitAction::EnterOld;
-            *is_action_performed = true;
-        }
     }
 }
 
 impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for RecursiveStateVisitor<'a, E, A> {
     type Item = E::State;
 
+    #[inline(always)]
     fn advance(&mut self) {
-        match &self.last_action {
-            LastVisitAction::New => {
-                self.last_action = LastVisitAction::EnterNew;
-            },
-            LastVisitAction::EnterNew|LastVisitAction::EnterOld => {
-                let mut is_action_performed = false;
-                let is_enter = if let LastVisitAction::EnterNew = self.last_action { true } else { false };
-                if is_enter {
-                    if self.need_expand_current {
-                        let mut actions = self.agent.generate_actions(&self.state).peekable();
-                        if let Some(action) = actions.peek() {
-                            Self::apply_action(&self.env, &mut self.last_action, &mut is_action_performed, &mut self.state, action);
-                            self.stack.push(actions);
-                        }
-                    } else {
-                        Self::rollback_action(&self.env, &mut self.stack, &mut self.last_action, &mut is_action_performed, &mut self.state);
-                    }
+        if !self.need_expand_current {
+            self.env.rollback(&mut self.state, &self.stack.last().unwrap().1);
+            self.last_action_in = false;
+            self.need_expand_current = true;
+        } else if self.last_action_in {
+            let mut actions = self.agent.generate_actions(&self.state);
+            if let Some(action) = actions.next() {
+                self.env.apply(&mut self.state, &action);
+                self.stack.push((actions, action));
+            }
+        } else {
+            if let Some(iter) = self.stack.last_mut() {
+                if let Some(action) = iter.0.next() {
+                    self.env.apply(&mut self.state, &action);
+                    self.last_action_in = true;
+                    iter.1 = action;
+                } else {
+                    self.env.rollback(&mut self.state, &iter.1);
+                    self.stack.pop();
                 }
-                if !is_action_performed {
-                    if let Some(iter) = self.stack.last_mut() {
-                        if let Some(action) = iter.peek() {
-                            Self::apply_action(&self.env, &mut self.last_action, &mut is_action_performed, &mut self.state, action);
-                        } else {
-                            self.stack.pop();
-                            Self::rollback_action(&self.env, &mut self.stack, &mut self.last_action, &mut is_action_performed, &mut self.state);
-                        }
-                    }
-                }
-                if !is_action_performed {
-                    self.last_action = LastVisitAction::Done;
-                }
-                self.need_expand_current = true;
-            },
-            LastVisitAction::Done => {}
+            } else {
+                self.is_finished = true;
+            }
         }
     }
 
+    #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
-        match &self.last_action {
-            LastVisitAction::Done => None,
-            _ => Some(&self.state)
+        if self.is_finished {
+            None
+        } else {
+            Some(&self.state)
         }
     }
 }
@@ -143,10 +122,11 @@ impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldCon
 impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldContinueSearch<E>> StreamingIterator for RecursiveStateGenerator<'a, E, A> {
     type Item = E::State;
 
+    #[inline(always)]
     fn advance(&mut self) {
         self.visitor.advance();
-        while let LastVisitAction::EnterNew|LastVisitAction::EnterOld = self.visitor.last_action {
-            if self.env.is_terminal_state(&self.visitor.state) {
+        while !self.visitor.is_finished {
+            if self.visitor.last_action_in && self.env.is_terminal_state(&self.visitor.state) {
                 self.visitor.stop_expand_current();
                 break;
             } else if !self.visitor.agent.should_continue(&self.visitor.state) {
@@ -156,10 +136,8 @@ impl<'a, E: Environment + IsTerminalState<E>, A: ActionsGenerator<E> + ShouldCon
         }
     }
 
+    #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
-        match &self.visitor.last_action {
-            LastVisitAction::Done => None,
-            _ => Some(&self.visitor.state)
-        }
+        self.visitor.get()
     }
 }
