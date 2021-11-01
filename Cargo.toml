@@ -7,3 +7,7 @@ authors = ["Evgeny Shavlyugin <eshavlyugin@gmail.com>"]
 streaming-iterator = "0.1.5"
 num = "0.4.0"
 enum-display-derive = "0.1.1"
+rand = "0.8.4"
+
+[profile.test]
+opt-level = 3

@@ -4,8 +4,8 @@ mod graph {
     use streaming_iterator::{convert, StreamingIterator};
 
     pub trait Graph {
-        type Node: Sized;
-        type Edge: Sized;
+        type Node: Sized + Clone;
+        type Edge: Sized + Clone;
         type NodeIterator: Iterator<Item=Self::Node>;
         type EdgeIterator: Iterator<Item=Self::Edge>;
 

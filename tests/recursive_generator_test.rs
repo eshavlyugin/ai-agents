@@ -42,7 +42,7 @@ impl ActionsGenerator<SeqEnvironment> for SeqAgent {
     type ActionsIterator = Range<u8>;
 
     fn generate_actions(&mut self, _: &Vec<u8>) -> Self::ActionsIterator {
-        (1u8..9u8).into_iter()
+        (1u8..4u8).into_iter()
     }
 }
 

@@ -1,4 +1,7 @@
 mod graph;
+pub mod simulated_annealing;
+mod dynamic_programming;
+mod alpha_beta;
 
 extern crate streaming_iterator;
 extern crate num;
@@ -10,8 +13,8 @@ use streaming_iterator::StreamingIterator;
 use std::fmt::Display;
 
 pub trait Environment {
-    type State: Sized;
-    type Action: Sized;
+    type State: Sized + Clone;
+    type Action: Sized + Clone;
 
     fn apply(&self, state: &mut Self::State, action: &Self::Action);
     fn rollback(&self, state: &mut Self::State, action: &Self::Action);
@@ -22,9 +25,7 @@ pub trait IsTerminalState<E: Environment> {
 }
 
 pub trait WeightedState<E: Environment> {
-    type Weight: num::Float;
-
-    fn calc_weight(&mut self, state: &mut E::State) -> Self::Weight;
+    fn calc_weight(&mut self, state: &E::State) -> f64;
 }
 
 pub trait ActionsGenerator<E: Environment> {
@@ -48,12 +49,13 @@ pub struct RecursiveStateVisitor<'a, E: Environment, A: ActionsGenerator<E>> {
     env: &'a E,
     agent: A,
     last_action: LastVisitAction,
+    last_applied_action: Option<E::Action>,
     need_expand_current: bool,
 }
 
 impl<'a, E: Environment, A: ActionsGenerator<E>> RecursiveStateVisitor<'a, E, A> {
     pub fn new(initial: E::State, env: &'a E, agent: A) -> RecursiveStateVisitor<'a, E, A> {
-        RecursiveStateVisitor { stack: vec![], state: initial, env, agent, last_action: LastVisitAction::EnterNew, need_expand_current: true}
+        RecursiveStateVisitor { stack: vec![], state: initial, env, agent, last_action: LastVisitAction::EnterNew, last_applied_action: None, need_expand_current: true}
     }
 
     #[inline(always)]
@@ -68,8 +70,10 @@ impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for Recursive
     #[inline(always)]
     fn advance(&mut self) {
         if !self.need_expand_current {
-            self.env.rollback(&mut self.state, &self.stack.last().unwrap().1);
+            let (_, action) = self.stack.last().unwrap();
+            self.env.rollback(&mut self.state, &action);
             self.last_action = LastVisitAction::EnterOld;
+
             self.need_expand_current = true;
         } else if self.last_action == LastVisitAction::EnterNew {
             let mut actions = self.agent.generate_actions(&self.state);
@@ -86,9 +90,13 @@ impl<'a, E: Environment, A: ActionsGenerator<E>> StreamingIterator for Recursive
                 } else {
                     self.env.rollback(&mut self.state, &iter.1);
                     self.stack.pop();
+                    if self.stack.is_empty() {
+                        self.last_action = LastVisitAction::Done;
+                    } else {
+                        self.last_action = LastVisitAction::EnterOld;
+                    }
                 }
             } else {
-                self.last_action = LastVisitAction::Done;
             }
         }
     }
